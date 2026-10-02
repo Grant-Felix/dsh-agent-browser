@@ -16,7 +16,8 @@ import { AgentBrowser } from '../src/browser.js';
 import { resolveConfig } from '../src/config.js';
 import { defaultRegistryPath } from '../src/registry.js';
 
-const home = process.argv[2] ?? '/var/home/felix';
+// No personal default: the caller passes the home directory to inspect.
+const home = process.argv[2] ?? process.env.HOME ?? '.';
 let failures = 0;
 function check(label, condition, detail = '') {
   if (condition) console.log(`PASS  ${label}${detail ? `  — ${detail}` : ''}`);

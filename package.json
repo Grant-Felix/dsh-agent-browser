@@ -1,15 +1,14 @@
 {
   "name": "dsh-agent-browser",
   "version": "0.1.0",
-  "private": true,
-  "description": "Agent browser for DSH: a real Chrome-Linux browser driven over CDP, shown live in the right Sidebar, plus agent-facing browser tools.",
-  "type": "module",
-  "main": "./index.js",
-  "exports": {
-    ".": "./index.js",
-    "./client": "./client.js",
-    "./package.json": "./package.json"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Grant-Felix/dsh-agent-browser.git"
   },
+  "private": true,
+  "type": "module",
+  "description": "Agent browser for DSH: a real Chrome-Linux browser driven over CDP, shown live in the right Sidebar, plus agent-facing browser tools.",
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
@@ -23,6 +22,15 @@
       ]
     }
   },
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
   "files": [
     "index.js",
     "client.js",
@@ -30,8 +38,5 @@
     "docs",
     "cordis.patch.yml",
     "README.md"
-  ],
-  "engines": {
-    "node": ">=22"
-  }
+  ]
 }

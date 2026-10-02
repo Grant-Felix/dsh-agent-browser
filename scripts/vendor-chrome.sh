@@ -10,7 +10,12 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ZIP="${1:-/var/home/felix/项目/chrome-linux.zip}"
+ZIP="${1:-}"
+if [[ -z "$ZIP" ]]; then
+  echo "chrome-linux zip not given" >&2
+  echo "usage: $0 path/to/chrome-linux.zip [--into-data-dir]" >&2
+  exit 1
+fi
 MODE="${2:-}"
 
 if [[ ! -f "$ZIP" ]]; then
