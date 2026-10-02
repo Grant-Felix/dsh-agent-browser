@@ -19,7 +19,6 @@ if (files.length === 0) {
 const quadrants = files
   .map((name) => JSON.parse(readFileSync(join(dir, name), 'utf8')))
   .sort((a, b) => `${a.engine}-${a.mode}`.localeCompare(`${b.engine}-${b.mode}`));
-// One display mode now, so the sort is just "chromium before firefox".
 quadrants.sort((a, b) => `${a.engine}-${a.mode}`.localeCompare(`${b.engine}-${b.mode}`));
 
 const ids = [...new Set(quadrants.flatMap((q) => q.results.map((r) => r.id)))];

@@ -27,11 +27,9 @@ Sidebar** 的一个原生 tab 里；agent 侧的浏览器操作则通过 `agent_
 | 冷启动时面板路由注册（`ctx.inject(['webServer'])`） | ✅ 已验证（冷启动复验通过） | 重启后 `GET /status` = **200**；修法与根因见 [ARCHITECTURE.md](docs/ARCHITECTURE.md) §8 |
 | 面板休眠态（记忆列表 + 恢复按钮） | ⏳ 待人工确认 | 路由与视口链路已通；休眠占位需点一次「收页」看 |
 | 视口**实时**跟随面板（拖侧边栏/换显示器都跟） | ✅ 已验证（活宿主拖拽轨迹） | 用户在真 GUI 里拖动分隔条，`viewport` 连续变化 1127→…→903→920→…→1007，`frame` 慢一次绘制跟随；运行时 29 项断言 |
-| **Firefox 原生支持（WebDriver BiDi）** | ✅ 已验证 | `scripts/smoke-firefox.mjs` 18 条断言、有头/无头皆过；帧为轮询（7 帧/2.5s @fps=3） |
 | **现代风控通过率（实测）** | ✅ 已验证 | reCAPTCHA v3 **0.9**、Turnstile **出 token**、Cloudflare 基准页 **1.0s 通过**（有头/无头皆然）；`scripts/measure-challenge.mjs` |
 | **真拖拽（按住移动）与命名键** | ✅ 已验证 | 滑块 value=76/100；方向键 50→52。修掉两个真 bug：move 缺 `button:'left'`（拖拽一直是坏的）、`modifiers` 传数组而 CDP 要 int 位掩码（命名键一直被拒） |
 | **输入自然化（`humanizeInput`）** | ✅ 已验证 | 曲线轨迹/按下停留/逐字打字；断言覆盖"点击仍会跳转"与"逐字输入完整" |
-| **两个后端同时只能跑一个** | ✅ 已验证 | 复用 `browser.json`（不新增状态文件）记录 `{pid, port, engine}`；另一引擎在跑时**拒绝启动并说明持有人**：`state=failed, "the firefox backend is already running (pid …, port …) — only one backend may run at a time"`；持有人停止后同一启动即可成功。此前的漏洞是真的：孤儿清理用**本引擎的协议**探测端口，跨引擎必然失败，于是活着的 Firefox 对 Chromium 不可见 → 两个后端会同时跑 |
 | **可检测性（实测 0/58）** | ✅ 已验证 | 离屏渲染用 `--ozone-platform=headless`：UA 是 `Chrome`（非 HeadlessChrome）、WebGL 是真 GPU、`webdriver:false`、**sannysoft 58 项 0 失败**（`--headless=new` 是 4 失败） |
 | **人机验证：检测并交给真人** | ✅ 已验证 | 面板提示条 + 工具 `⚠`；断言覆盖 Sogou 反爬页（识别）与普通页（清除） |
 | **搜索引擎：预配置 + 实测 + 自主选择** | ✅ 已验证（真实网络） | `scripts/smoke-search.mjs`：10 个预配置引擎；4 个引擎实测 2.2s 排完名次并落盘；Google/百度/Brave/Mojeek 的拦截页被正确判为不可用；`search` 只给查询词即可 |
@@ -46,10 +44,9 @@ Sidebar** 的一个原生 tab 里；agent 侧的浏览器操作则通过 `agent_
 | **侧边栏实时同步（有头/无头都一样）** | ✅ 已验证（四组合，量化） | `scripts/smoke-visibility.mjs` 走**面板真正的那条链路**（`GET /api/agent-browser/stream` SSE，过真实路由层）：四组合全部收到帧、动作→面板出新帧 **121–223 ms**；面板点击也真的落到页面上 |
 | **截图回给模型（图片块）** | ✅ 已验证（工具层） | `action=screenshot` 的字节交给 attachment 服务，返回 `[{text},{image}]`；`noImage=true` 只回字节数。断言覆盖渲染与降级 |
 | **SSE 自动重连 + 面板自愈** | ✅ 服务端已验证 · ⏳ 视觉待你确认 | 断线后指数退避重连并重拉一次 status；服务端 close 时清理监听（断言：重连后仍有帧 `{"status":1,"frame":4}`） |
-| **下载捕获** | ✅ 已验证（Chromium） | 本地服务器发 `Content-Disposition` → 文件真落盘且内容一致；**点链接下载**同样成立；Firefox 的 BiDi 无下载命令，如实报 `downloadDir: null` |
-| **Firefox `navigator.webdriver` 覆盖** | ✅ 已验证 | 实测 4 种 pref 全无效 → 改用 BiDi `script.addPreloadScript` 覆盖；差分断言：关掉即恢复 `true` |
+| **下载捕获** | ✅ 已验证（Chromium） | 本地服务器发 `Content-Disposition` → 文件真落盘且内容一致；**点链接下载**同样成立 |
 | 每会话隔离浏览器 | ❌ 未做（M3） | 页面级隔离已就绪，进程级共享 |
-| **登录态导入（真实浏览器 → agent 浏览器）** | ✅ 已验证（Chromium 系） | Helium 527 条 0 失败；导入 GitHub 后 `meta[user-login]=Grant-Felix`；httpOnly 保留、重启存活。**Firefox 侧 `storage.setCookies` 该构建未实现**（实测），仍需另做 |
+| **登录态导入（真实浏览器 → agent 浏览器）** | ✅ 已验证（Chromium 系） | Helium 527 条 0 失败；导入 GitHub 后 `meta[user-login]=Grant-Felix`；httpOnly 保留、重启存活。|
 
 ---
 
@@ -123,13 +120,11 @@ config，要连同想保留的字段一起写**）：
 
 | 字段 | 默认 | 说明 |
 |---|---|---|
-| `browser` | `'auto'` | 用哪个引擎：`auto`（有 Chromium 就用，否则 Firefox）/ `chromium` / `firefox` |
-| `firefoxPath` | `''` | Firefox 二进制；空 = 用随项目附带的 `vendor/firefox/`，再找 PATH |
+| `browser` | `'chromium'` | 本构建只有一个引擎：Chromium（CDP） |
 | `chromePath` | `''` | 浏览器二进制。空 = 依次找 `vendor/chrome-linux/chrome` → 数据目录 → PATH |
 | `headless` | `'auto'` | **有显示器就有头，没有才无头**。实测：无头在检测页 58 项里失败 4 项（UA 里的 `HeadlessChrome`、SwiftShader 软件 WebGL、800×600 假屏幕），同一构建有头 **0 失败**。`true`/`false` 可强制 |
-| `downloadDir` | `''` | 下载落盘目录；空 = `<状态目录>/downloads`（Chromium 有效，Firefox 无此命令） |
+| `downloadDir` | `''` | 下载落盘目录；空 = `<状态目录>/downloads` |
 | `virtualScreenWidth` / `virtualScreenHeight` | `1280` / `900` | **面板尚未上报尺寸时**使用的虚拟屏幕。离屏渲染的浏览器没有自己的屏幕，0×0 会完全不渲染（实测：帧 0、点击落空）。面板一连上就用它的实测尺寸覆盖 |
-| `hideWebdriver` | `true` | **Firefox 专用，且是主动覆盖**：用 BiDi 预加载脚本把 `navigator.webdriver` 改成 false。Chromium 天然为 false（我们不传 `--enable-automation`）。关掉即让 Firefox 如实自报 |
 | `userDataDir` | `''` | 空 = `~/.local/share/dsh-agent-browser/profile`（登录态落盘，跨重启保留） |
 | `startUrl` | `about:blank` | 冷启动后打开的第一页 |
 | `viewportWidth` / `viewportHeight` | `0` / `0` | **0 = 自动**：不覆盖，页用引擎自己的视口。本项目**不假定任何屏幕尺寸**（用户屏幕不同、侧边栏宽度还会被随时拖拽）；想钉死尺寸时才填数字 |
@@ -253,8 +248,8 @@ CDP 相关的行（`CHR_DEBUG_TOOLS`、`WebDriver`、`Selenium`）在两种模�
 
 - 用户看的、点的，是 **DSH 右侧栏面板**；数据路径是 **`GET /api/agent-browser/stream`（SSE）→ 面板渲染**，
   面板的点击/滚轮/按键经 `POST /command {action:'input'}` 回到运行时。
-- **桌面上不会出现任何浏览器窗口**。引擎在离屏渲染（Chromium 用 `--ozone-platform=headless`、
-  Firefox 用 `--headless`）——**那是实现细节，不是本插件的模式名**；状态里只报 `mode: sidebar-headed`。
+- **桌面上不会出现任何浏览器窗口**。引擎在**离屏平台**上渲染（Chromium 的 `--ozone-platform=headless`）
+  ——**那是引擎的实现细节，不是本插件的模式名**：浏览器本身仍是**有头**的（普通 `Chrome` UA、真 GPU）。
 - **"不显示"等同于无头，所以面板在浏览器就必须在**（两条硬规则，都已断言）：
   1. **面板一连上就自动启动浏览器**（不需要工具调用、不需要点按钮），面板永不显示空占位；
   2. **只要面板在看，浏览器就不算空闲**——空闲回收既不停浏览器、也不回收**正在显示的那一页**。
@@ -262,18 +257,12 @@ CDP 相关的行（`CHR_DEBUG_TOOLS`、`WebDriver`、`Selenium`）在两种模�
      `sweep while watched -> stopped:false, parked:[]`、`sweep with no panel -> stopped:true`。
 - 屏幕尺寸来自**面板自己的实测盒子**（实测：面板 1147×1397 → 页面 1147×1397）。面板尚未上报时用
   `virtualScreenWidth/Height` 兜底，因为 0×0 会完全不渲染（实测帧 0、点击落空）。
-- 实测（`scripts/smoke-visibility.mjs`，四组合，走上面的真实链路）：
+- 实测（`scripts/smoke-visibility.mjs`，走上面的真实链路）：**动作 → 面板出现新帧 214–223 ms**。
 
-| 组合 | 动作 → 面板出现新帧 | 2.5s 内帧数 |
-|---|---|---|
-| Chromium 有头 | **223 ms** | 2 |
-| Chromium 无头 | **214 ms** | 2 |
-| Firefox 有头 | **121 ms** | 8 |
-| Firefox 无头 | **123 ms** | 8 |
 
 **帧是按需产生的，这点要说清**：Chromium 用事件推送（`Page.startScreencast`，画面**变了才发**），
 所以静止页面 2.5 秒只有 2 帧是正常的——面板显示的是"最后一帧"，画面变化时立刻跟上；
-Firefox 没有 screencast，按 fps 轮询，所以帧数更多。两者都不影响"实时同步"：延迟测的是**动作到画面变化**。
+这不影响"实时同步"：延迟测的是**动作到画面变化**；面板连接时还会重放最后一帧，静止页也不会空白。
 
 ## 改了客户端代码要怎样才生效（实测，别踩这个坑）
 
@@ -443,86 +432,39 @@ ball.tabs              {n} 个标签页
 
 实现要点（`src/login-import.js`，零依赖）：
 
-- Chromium 系 cookie 是**加密**的（Linux 上是 `v11`）：AES-128-CBC，密钥由钥匙环口令经
+- cookie 是**加密**的（Linux 上是 `v11`）：AES-128-CBC，密钥由钥匙环口令经
   PBKDF2-HMAC-SHA1（salt `saltysalt`、1 轮、16 字节）派生，IV 为 16 个空格，明文是
   `SHA256(host_key) ‖ 值`。**域名哈希就是解密正确性的证明**（本机 6/6 匹配），不是"看起来像"。
-- Firefox 的 `cookies.sqlite` **不加密**，直接读。
 - 用 `node:sqlite` 只读打开、`node:crypto` 解密；**报告里永远不含 cookie 值**，只有名称、数量与哈希长度。
 - 安全默认：工具侧 `dryRun` 默认 **true**，必须显式关掉才会复制。
 
-**已知限制（实测）**：Firefox 的 BiDi 构建**未实现 `storage.setCookies`**（调用即报错），
-所以**目前只有 Chromium 系能导入**；Firefox 侧要导入需另行处理（其 `cookies.sqlite` 是明文，
-但必须在 Firefox 关闭时写入）。
 
-## Firefox 原生支持（WebDriver BiDi）
+## 只有一个引擎：Chromium（CDP）
 
-**Firefox 没有 CDP**——实测 Firefox 157 的调试端口上 `/json/version`、`/json/list` 一律 404。
-Firefox 官方的是 **[WebDriver BiDi](https://www.w3.org/TR/2024/WD-webdriver-bidi-20241218/)**（W3C 标准，
-由 Firefox 自带的 Remote Agent 提供，端点在 `ws://127.0.0.1:PORT/session`；参见
-[MDN：Create a WebDriver BiDi connection](https://developer.mozilla.org/en-US/docs/Web/WebDriver/How_to/Create_BiDi_connection)
-与 [Mozilla 远程协议文档](https://firefox-source-docs.mozilla.ac.cn/remote/index.html)）。
-本项目为两个引擎各写一个后端，共用同一套运行时（页面注册表、两级回收、持久化、帧节奏、视口跟随）
-与同一份**人手运动模型**：
+本项目**只支持 Chromium**。曾经同时支持 Firefox（WebDriver BiDi）：Firefox 157 的调试端口上
+`/json/version`、`/json/list` 一律 404，官方接口只有 BiDi（`ws://127.0.0.1:PORT/session`），
+于是为它单写了一个后端（BiDi 客户端、RemoteValue 反序列化、轮询帧、私有区码点键…）。
+**已整体移除**：两个引擎意味着两套协议、两套 profile 布局、两套各自的坑，维护成本翻倍而能力没有翻倍。
+**要再支持 Firefox，应当作为独立项目**——`#io` 接缝（`src/backends/`）与协议无关的传输层
+（`src/remote.js`）都还在，接回来的成本主要是重写那一个后端。
 
-| | Chromium | Firefox |
-|---|---|---|
-| 协议 | Chrome DevTools Protocol（Chrome 官方） | **WebDriver BiDi**（W3C 标准，Firefox 官方） |
-| 画面 | `Page.startScreencast` 事件推送 | **轮询 `browsingContext.captureScreenshot`** |
-| 实测帧率 | 12+ fps | **7 帧 / 2.5s（fps=3）** |
-| 输入 | `Input.dispatch*`（可信事件） | `input.performActions`（可信事件） |
-| 命名键 | `windowsVirtualKeyCode` + 位掩码 modifiers | **WebDriver 私有区码点**（`\uE014`=ArrowRight） |
-| 拖拽 | `mousePressed` + `buttons/button` | 协议自己维护输入源状态，无需传按键 |
+删掉的东西（避免后来者以为它们还在）：`src/backends/firefox.js`、`src/bidi.js`、
+`scripts/smoke-firefox.mjs`、`scripts/probe-firefox-protocol.mjs`、`scripts/vendor-firefox.sh`、
+`browser: 'auto'|'firefox'` 与 `firefoxPath`、`hideWebdriver`（那是 Firefox 专用的 `navigator.webdriver` 覆盖）、
+以及 Firefox 的 `cookies.sqlite` 导入路径与跨引擎互斥。
 
-选择引擎：`browser: 'auto' | 'chromium' | 'firefox'`（`auto` 优先 Chromium，没有才用 Firefox），
-`firefoxPath` 可指定二进制（默认用随项目附带的 `vendor/firefox/`）。
 
-**实测踩到的三个真差异（都已修，有断言）**：
-1. **帧要靠轮询**：Firefox 没有 screencast，所以 `startFrames` 是定时器 + `captureScreenshot`，并且会
-   从 PNG 头里解出尺寸；代价是帧率低（诚实写在表里）。
-2. **命名键不接受 DOM 键名**：传 `value:'ArrowRight'` 被拒（"Expected `value` to be a string that represents
-   single code point or grapheme cluster"），必须用私有区码点 `\uE014`。
-3. **有头模式下新建标签页的 `setViewport` 会挂死**（实测 12s 超时；同一页加载完成后再 resize 就正常）——
-   所以**页面创建不再等待 resize**，改为加载后后台重试，失败只记日志、不影响页面可用性。
+## 通过率实测矩阵（历史四象限表已删除）
 
-验收：`scripts/smoke-firefox.mjs`，**18 条断言，有头与无头都通过**（覆盖 BiDi 嵌套值反序列化、
-轮询帧、BiDi 打字/点击/拖动滑块/命名键、视口、收页与恢复）。
+早期版本同时支持 Chromium 与 Firefox、并有"有头/无头"两档，所以有一张 2×2 象限表。**两个前提现在都不成立**
+（Firefox 已整体移除；显示模式只有一种），那张表既会误导，又会与"人机验证现状"一节产生两个互相矛盾的真相，
+因此删除。命令也不再需要引擎/模式参数：
 
-## 通过率实测矩阵：23 个挑战面 × 2 引擎 × 2 显示模式
-
-命令：`probe-challenges.mjs`（可达性普查）→ `measure-matrix.mjs <engine> <mode>`（四象限）→ `aggregate-matrix.mjs`（汇总）。
-**23/23 全部可达，境内 10/10**。下表为实测（2026-10-02，本机、本 IP）：
-
-| 系统 | Chromium 有头 | Chromium 无头 | Firefox 有头 | Firefox 无头 |
-|---|---|---|---|---|
-| **reCAPTCHA v3（分数）** | **PASS 0.9** | **PASS** | **PASS 0.9** | **PASS** |
-| **Cloudflare Turnstile** | **PASS（出 token）** | **PASS** | **PASS** | **PASS** |
-| **Cloudflare 机器人检测** | **PASS 0.5s** | **PASS 0.5s** | **PASS 0.5s** | **PASS 0.4s** |
-| Akamai | PASS | PASS | PASS | PASS |
-| 阿里云 nc（12306） | 判据未实现⁴ | 同 | 同 | 同 |
-| 极验滑块 | 挑战呈现¹ | 挑战呈现¹ | 挑战呈现¹ | 挑战呈现¹ |
-| 易盾拼图 | **挑战呈现（已拖动，未过）** | 同上 | 同上 | 同上 |
-| 微博（极验+易盾） | 挑战呈现 | 挑战呈现 | 挑战呈现 | 挑战呈现 |
-| reCAPTCHA v2 / hCaptcha | 挑战呈现 | 挑战呈现 | 挑战呈现 | 挑战呈现 |
-| DataDome | **挑战（可见拦截层，不自动放行）** | 同 | 同 | 同 |
-| PerimeterX | **BLOCKED** | **BLOCKED** | PASS² | **BLOCKED** |
-| 百度搜索 | **PASS（10 条结果）** | 挑战 | 挑战 | 挑战 |
-| 知乎 | PASS | PASS | PASS | PASS |
-| sannysoft 老检测页 | **PASS（0 失败）** | FLAGGED（4） | FLAGGED（2）³ | FLAGGED（2）³ |
-| pixelscan / browserscan | PASS | PASS | PASS | PASS |
-| creepjs | 判据未实现 | — | — | — |
-
-**通过数**：Chromium 有头 **8/18**、Chromium 无头 6/18、Firefox 有头 7/18、Firefox 无头 6/18。
-
-¹ 该演示页在点按钮前不渲染滑块，所以**未测到拖动**（记为"未测"，不是"失败"）。
-² 单次样本，更可能是 PerimeterX 評分波动，不足以证明 Firefox 更优。
-⁴ 12306 登录页没渲染出 `#nc_1_wrapper`，判据读不到容器 —— 记为**未判读**，不是「未拦截」。
-³ Firefox 的两项失败已定位：`Chrome (New)` 是**只要不是 Chrome 就必然失败**的检查（不可消除），
-`WebDriver (New)` 是 `navigator.webdriver` —— 我写了文档化的 pref `dom.webdriver.enabled=false`，
-Firefox 也确实读进了 `prefs.js`，**但该属性仍为 true**，**这一条我没修好**。
-
-**结论**：在真正决定放行的现代系统上（v3、Turnstile、Cloudflare）**两个引擎四个象限全部通过、且 v3 分数一致（0.9）**——
-**没有测出引擎间优劣**，Firefox 可以作为对等伙伴进入下一步。拦截类（PerimeterX/DataDome）与解谜类（极验/易盾/阿里）
-**不是类人操作能解决的**，落在"交给人"那条路径上。
+```bash
+HOME=$PWD/.dev/home node scripts/probe-challenges.mjs
+HOME=$PWD/.dev/home node scripts/measure-matrix.mjs
+node scripts/aggregate-matrix.mjs
+```
 
 ## 通过率：在现代风控上实测
 
@@ -625,7 +567,7 @@ HOME=$PWD/.dev/home node scripts/smoke-routes.mjs
 # 生命周期验收：收页 / 超时回收 / 上限 / 磁盘记忆 / 冷启动还原（29 项断言）
 HOME=$PWD/.dev/home node scripts/smoke-lifecycle.mjs
 
-# 可见且可操作：Chromium/Firefox × 有头/无头 四种组合
+# 可见且可操作：走面板真正的那条 SSE 链路
 HOME=$PWD/.dev/home node scripts/smoke-visibility.mjs
 
 # 下载捕获：本地服务器发附件 → 断言文件真落盘、内容一致
@@ -636,13 +578,8 @@ node scripts/smoke-login-import.mjs
 
 # 通过率矩阵：先普查可达性，再逐引擎 × 逐显示模式量
 HOME=$PWD/.dev/home node scripts/probe-challenges.mjs          # 23 个挑战面的可达性普查
-HOME=$PWD/.dev/home node scripts/measure-matrix.mjs chromium headed
-HOME=$PWD/.dev/home node scripts/measure-matrix.mjs firefox headless   # 四象限各跑一次
+HOME=$PWD/.dev/home node scripts/measure-matrix.mjs
 node scripts/aggregate-matrix.mjs                              # 汇总成对比表
-
-# Firefox 端到端（WebDriver BiDi）：18 条断言，有头/无头
-HOME=$PWD/.dev/home node scripts/smoke-firefox.mjs
-HOME=$PWD/.dev/home node scripts/smoke-firefox.mjs headed
 
 # 搜索引擎：真实网络探测、拦截识别、自主选择与落盘
 HOME=$PWD/.dev/home node scripts/smoke-search.mjs                    # 默认测 4 个引擎
@@ -650,9 +587,6 @@ HOME=$PWD/.dev/home node scripts/smoke-search.mjs bing,baidu,mojeek  # 或指定
 
 # 视口实时跟随的观测（拖侧边栏时看数值变化）
 node scripts/watch-viewport.mjs 120
-
-# Firefox 协议侦察（确认它有没有 CDP、BiDi 有哪些能力）
-node scripts/probe-firefox-protocol.mjs
 
 # 量化：每页内存、关页回收延迟、重开耗时
 HOME=$PWD/.dev/home node scripts/measure-lifecycle.mjs
@@ -709,7 +643,7 @@ Bing 搜索结果页内嵌一个身份 iframe，它会跳到 `https://www.bing.c
 
 修法（Chromium 后端）：以 `frame.parentId === undefined` 判定主框架并记住其 id（`Page.getFrameTree` 初始化），
 loading 事件也按该 id 过滤，避免子框架让加载状态抖动。
-Firefox 天生没这个问题：BiDi 的 `browsingContext.navigationStarted` / `load` 是**按 context** 投递的，
-运行时只订阅了顶层 context，子框架事件根本不会送到。
+（BiDi 之所以没这个病，是因为它的 `navigationStarted` / `load` 按 context 投递，只订阅顶层就天然隔离——
+那是被移除的第二个后端留下的一条经验，记在这里以免将来重蹈。）
 
 回归测试：`scripts/smoke-url.mjs`（本地自建同形状页面，两引擎都要过，不依赖第三方站点）。

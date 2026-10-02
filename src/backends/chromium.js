@@ -1,15 +1,14 @@
 /**
  * The Chromium backend: everything CDP-shaped, behind a semantic interface.
  *
- * The agent runtime owns the shared parts — the page registry, the two reclaim
- * hooks, persistence, viewport following, frame pacing, the HTTP face — and
- * talks to a backend only through the methods below. A second backend
- * (WebDriver BiDi, for Firefox) implements the same interface, so no engine
- * detail leaks into the runtime.
+ * The agent runtime owns the shared parts — the page registry, the reclaim hooks,
+ * persistence, viewport following, frame pacing, the HTTP face — and talks to a
+ * backend only through the methods below, so no CDP detail leaks upward.
  *
  * The interface is deliberately SEMANTIC (`click`, `key`, `text`, `startFrames`)
- * rather than a passthrough of CDP method names: BiDi expresses the same actions
- * with entirely different messages, and only the backend should know that.
+ * rather than a passthrough of CDP method names: a second backend would express
+ * the same actions with entirely different messages, and only the backend should
+ * know that. (One did, until it was removed — see backends/index.js.)
  */
 import { RemoteClient, RemoteError, waitForJson } from '../remote.js';
 import { planPath } from '../pointer.js';
@@ -145,9 +144,8 @@ export class ChromiumBackend {
   /**
    * The complete argv for this engine.
    *
-   * Every flag lives here rather than in the shared runtime, because the engines
-   * disagree about almost all of them: Firefox rejects `--user-data-dir` and has
-   * no `--no-first-run`, so a shared list cannot serve both.
+   * Every flag lives here rather than in the shared runtime: argv is the most
+   * engine-specific thing there is, so the backend owns all of it.
    */
   args({ config, port, userDataDir, viewport }) {
     const args = [

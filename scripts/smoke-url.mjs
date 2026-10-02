@@ -43,7 +43,7 @@ const main = createServer((req, res) => {
 await new Promise((resolve) => main.listen(0, '127.0.0.1', resolve));
 const mainUrl = `http://127.0.0.1:${main.address().port}/search?q=bilibili`;
 
-for (const engine of ['chromium', 'firefox']) {
+for (const engine of ['chromium']) {
   rmSync(defaultRegistryPath(), { force: true });
   const browser = new AgentBrowser({ config: resolveConfig({ browser: engine, sweepIntervalSec: 3600 }), log: () => {} });
   try {

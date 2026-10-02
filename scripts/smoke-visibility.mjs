@@ -17,7 +17,7 @@
 import { createServer } from 'node:http';
 import { rmSync } from 'node:fs';
 import { AgentBrowser } from '../src/browser.js';
-import { resolveConfig, resolveFirefoxPath } from '../src/config.js';
+import { resolveConfig } from '../src/config.js';
 import { defaultRegistryPath } from '../src/registry.js';
 import { registerRoutes } from '../src/routes.js';
 
@@ -73,18 +73,11 @@ function openStream(base) {
   return { frames, events, controller, ready };
 }
 
-// One mode per engine: this plugin never opens a desktop window.
-const combos = [
-  ['chromium', 'windowless'],
-  ['firefox', 'windowless'],
-];
+// One engine, one display mode: this plugin never opens a desktop window.
+const combos = [['chromium', 'sidebar-headed']];
 
 for (const [engine, mode] of combos) {
   const label = `${engine}/${mode}`;
-  if (engine === 'firefox' && !resolveFirefoxPath({})) {
-    console.log(`SKIP  ${label} — no Firefox binary`);
-    continue;
-  }
   rmSync(defaultRegistryPath(), { force: true });
   const browser = new AgentBrowser({
     config: resolveConfig({ browser: engine, sweepIntervalSec: 3600, fps: 6 }),

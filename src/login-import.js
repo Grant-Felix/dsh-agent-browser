@@ -8,7 +8,6 @@
  *    1 iteration, 16 bytes), IV of 16 spaces, and a plaintext of
  *    `SHA256(host_key) || value`. The domain hash is what proves a decryption is
  *    right instead of merely plausible — verified 6/6 on Helium's store.
- * 2. **Firefox cookies are not encrypted at all** (`cookies.sqlite`), so that
  *    path is a plain read.
  *
  * Everything is read through `node:sqlite` and `node:crypto`, so there is no
@@ -110,26 +109,13 @@ function chromiumProfiles(home = homedir()) {
   return found;
 }
 
-/** Every Firefox profile directory that exists. */
-function firefoxProfiles(home = homedir()) {
-  const root = join(home, '.mozilla', 'firefox');
-  if (!existsSync(root)) return [];
-  const found = [];
-  for (const entry of readdirSync(root, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    const file = join(root, entry.name, 'cookies.sqlite');
-    if (existsSync(file)) found.push({ kind: 'firefox', name: `firefox/${entry.name}`, file });
-  }
-  return found;
-}
-
 /**
  * List every cookie store this machine has, with counts but no values.
  * @returns `[{ kind, name, file, cookies, domains }]`.
  */
 export function listCookieSources({ home = homedir() } = {}) {
   const sources = [];
-  for (const source of [...chromiumProfiles(home), ...firefoxProfiles(home)]) {
+  for (const source of chromiumProfiles(home)) {
     try {
       const db = openDatabase(source.file);
       const row = db.prepare('SELECT COUNT(*) AS cookies, COUNT(DISTINCT host_key) AS domains FROM cookies').get();
@@ -151,39 +137,30 @@ export function listCookieSources({ home = homedir() } = {}) {
 export function readCookies(source, { domains = [], limit = 4000 } = {}) {
   const db = openDatabase(source.file);
   const filter = domains.length > 0 ? domains : null;
-  // The two engines share no column names. Chromium also stores expiry as
-  // MICROseconds since 1601, which exceeds Number.MAX_SAFE_INTEGER — asking for it
-  // directly makes node:sqlite throw "Value is too large to be represented as a
-  // JavaScript number", so SQLite does the arithmetic itself.
-  const query =
-    source.kind === 'firefox'
-      ? `SELECT host AS host_key, name, value, NULL AS encrypted_value, path,
-                CAST(expiry AS INTEGER) AS expires_unix,
-                isSecure AS is_secure, isHttpOnly AS is_httponly, sameSite AS samesite
-         FROM moz_cookies LIMIT ?`
-      : `SELECT host_key, name, value, encrypted_value, path,
+  // Chromium stores expiry as MICROseconds since 1601, which exceeds
+  // Number.MAX_SAFE_INTEGER — asking for it directly makes node:sqlite throw
+  // "Value is too large to be represented as a JavaScript number", so SQLite does
+  // the arithmetic itself.
+  const query = `SELECT host_key, name, value, encrypted_value, path,
                 CAST(expires_utc / 1000000 - 11644473600 AS INTEGER) AS expires_unix,
                 is_secure, is_httponly, samesite
          FROM cookies LIMIT ?`;
   const rows = db.prepare(query).all(limit);
   db.close();
 
-  let key = null;
-  if (source.kind === 'chromium') {
-    const found = keyringPassword([source.app, ...KEYRING_APPS].filter(Boolean));
-    if (!found) return { cookies: [], decrypted: 0, failed: rows.length, scheme: 'none', error: 'no keyring password available' };
-    key = deriveKey(found.password);
-  }
+  const found = keyringPassword([source.app, ...KEYRING_APPS].filter(Boolean));
+  if (!found) return { cookies: [], decrypted: 0, failed: rows.length, scheme: 'none', error: 'no keyring password available' };
+  const key = deriveKey(found.password);
 
   const cookies = [];
   let decrypted = 0;
   let failed = 0;
-  let scheme = source.kind === 'firefox' ? 'plaintext' : 'unknown';
+  let scheme = 'unknown';
   for (const row of rows) {
     const host = String(row.host_key ?? '');
     if (filter && !filter.some((domain) => host === domain || host.endsWith(domain) || host.endsWith(`.${domain}`))) continue;
     let value = row.value ?? '';
-    if (source.kind === 'chromium' && row.encrypted_value) {
+    if (row.encrypted_value) {
       try {
         const result = decryptChromiumValue(row.encrypted_value, host, key);
         scheme = result.scheme ?? scheme;

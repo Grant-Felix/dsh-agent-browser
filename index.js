@@ -20,9 +20,8 @@ export const inject = ['tools'];
 /** Every field is optional; an empty row installs a working default browser. */
 export const Config = z.object({
   chromePath: z.string().default(''),
-  // 'auto' = Chromium when present, otherwise Firefox.
-  browser: z.union([z.const('auto'), z.const('chromium'), z.const('firefox')]).default('auto'),
-  firefoxPath: z.string().default(''),
+  // One engine in this build: Chromium over CDP.
+  browser: z.const('chromium').default('chromium'),
   // 'auto' = headed when a display is reachable, headless otherwise.
   // There is one display mode (headed, with the Sidebar panel as the head), so
   // there is no headless or visible-window setting to configure.
@@ -43,7 +42,6 @@ export const Config = z.object({
   viewportMaxHeight: z.natural().default(10000),
   humanizeInput: z.boolean().default(true),
   downloadDir: z.string().default(''),
-  hideWebdriver: z.boolean().default(true),
   pointerModel: z.union([z.const('human'), z.const('linear')]).default('human'),
   pointerSpeedPxPerSec: z.natural().default(900),
   pointerJitter: z.number().default(1),
@@ -135,6 +133,6 @@ export function apply(ctx, config) {
 
   const resolution = describeResolution(resolved);
   log(
-    `ready | chrome=${resolution.chromePath ?? 'NOT FOUND'} | profile=${resolution.userDataDir} | headless=${resolution.headless} | panel route=${panelRoute}`,
+    `ready | chrome=${resolution.chromePath ?? 'NOT FOUND'} | profile=${resolution.userDataDir} | mode=${resolution.mode} | panel route=${panelRoute}`,
   );
 }

@@ -17,12 +17,10 @@ export const DEFAULTS = Object.freeze({
   /** Chrome/Chromium binary. Empty = resolve Chrome-Linux, then data dirs, then PATH. */
   chromePath: '',
   /**
-   * Which engine to drive. `'auto'` prefers Chromium and falls back to Firefox.
-   * Firefox 157 speaks WebDriver BiDi only — it exposes no CDP at all.
+   * Which engine to drive. This build has exactly one: Chromium over CDP.
+   * A second engine was removed on purpose (see src/backends/index.js).
    */
-  browser: 'auto',
-  /** Firefox binary. Empty = the vendored build, then PATH. */
-  firefoxPath: '',
+  browser: 'chromium',
 
   /**
    * The virtual screen used while no panel has reported its own size.
@@ -69,21 +67,6 @@ export const DEFAULTS = Object.freeze({
   humanizeInput: true,
   /** Where downloads land. Empty = `<state dir>/downloads`. */
   downloadDir: '',
-  /**
-   * Firefox-only parity fix, and an ACTIVE OVERRIDE — read this before flipping it.
-   *
-   * Firefox reports `navigator.webdriver === true` as soon as its Remote Agent is
-   * on, and measurement on this build shows no preference can change that any
-   * more (`dom.webdriver.enabled` and `marionette.enabled` were both tested, alone
-   * and together: still true). Chromium never reports it here, because this
-   * project simply does not pass `--enable-automation`.
-   *
-   * With this on, a WebDriver BiDi `script.addPreloadScript` redefines the
-   * property to false in every document. That is not a configuration switch — it
-   * is the browser being told to misreport a fact — so it is named as an override
-   * and can be turned off to let Firefox identify itself.
-   */
-  hideWebdriver: true,
   /** 'human' plans hand-like paths; 'linear' teleports (kept for A/B tests). */
   pointerModel: 'human',
   /** Cruise speed for a planned path; duration follows distance / speed. */
@@ -224,8 +207,7 @@ export function resolveConfig(raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
   return {
     chromePath: asString(src.chromePath).trim(),
-    browser: ['chromium', 'firefox'].includes(src.browser) ? src.browser : 'auto',
-    firefoxPath: asString(src.firefoxPath).trim(),
+    browser: 'chromium',
     virtualScreenWidth: clampInt(src.virtualScreenWidth, 200, 10000, DEFAULTS.virtualScreenWidth),
     virtualScreenHeight: clampInt(src.virtualScreenHeight, 200, 10000, DEFAULTS.virtualScreenHeight),
     userDataDir: asString(src.userDataDir).trim(),
@@ -240,7 +222,6 @@ export function resolveConfig(raw) {
     viewportMaxHeight: clampInt(src.viewportMaxHeight, 1, 100000, DEFAULTS.viewportMaxHeight),
     humanizeInput: asBoolean(src.humanizeInput, DEFAULTS.humanizeInput),
     downloadDir: asString(src.downloadDir, DEFAULTS.downloadDir).trim(),
-    hideWebdriver: asBoolean(src.hideWebdriver, DEFAULTS.hideWebdriver),
     pointerModel: src.pointerModel === 'linear' ? 'linear' : 'human',
     pointerSpeedPxPerSec: clampInt(src.pointerSpeedPxPerSec, 60, 6000, DEFAULTS.pointerSpeedPxPerSec),
     pointerJitter: clampNumber(src.pointerJitter, 0, 5, DEFAULTS.pointerJitter),
@@ -279,12 +260,9 @@ export function stateDir() {
 export function resolveUserDataDir(config, engine = 'chromium') {
   const configured = asString(config?.userDataDir).trim();
   if (configured) return isAbsolute(configured) ? configured : resolve(configured);
-  // One directory per engine. They used to share `profile/`, which put Chromium's
-  // `Default/` tree and Firefox's `prefs.js`/`places.sqlite` in the same place —
-  // two incompatible layouts, and a switch of engine would hand Firefox a
-  // Chromium profile (or the reverse). Chromium keeps the old name so existing
-  // logins survive.
-  return engine === 'firefox' ? join(stateDir(), 'profile-firefox') : defaultUserDataDir();
+  // One engine, one profile layout: Chromium's `Default/` tree under `profile/`.
+  // (A second engine used to need its own directory; that is gone with it.)
+  return defaultUserDataDir();
 }
 
 /** Locate one executable on PATH. */
@@ -335,30 +313,6 @@ export function resolveChromePath(config) {
   return undefined;
 }
 
-/**
- * Resolve the Firefox binary: the vendored build first (this project ships one),
- * then PATH.
- * @returns the absolute path, or `undefined` when nothing usable was found.
- */
-export function resolveFirefoxPath(config) {
-  const candidates = [
-    config?.firefoxPath,
-    join(PACKAGE_ROOT, 'vendor', 'firefox', 'firefox', 'firefox'),
-    join(stateDir(), 'firefox', 'firefox'),
-  ];
-  for (const candidate of candidates) {
-    try {
-      if (candidate && existsSync(candidate)) return candidate;
-    } catch {
-      // Unreadable candidate: keep looking.
-    }
-  }
-  for (const name of ['firefox', 'firefox-esr', 'firefox-bin']) {
-    const found = whichSync(name);
-    if (found) return found;
-  }
-  return undefined;
-}
 
 /** A short, non-identifying description of what the runtime resolved. */
 export function describeResolution(config) {
@@ -366,7 +320,6 @@ export function describeResolution(config) {
   return {
     browser: config?.browser ?? 'auto',
     chromePath: chromePath ?? null,
-    firefoxPath: resolveFirefoxPath(config) ?? null,
     userDataDir: resolveUserDataDir(config),
     mode: resolveDisplayMode().mode,
   };

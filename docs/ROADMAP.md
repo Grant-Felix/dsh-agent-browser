@@ -88,17 +88,19 @@ curl -s http://127.0.0.1:3080/api/agent-browser/status
 - [x] 拖拽轨迹发现的缺陷已修：`pageViewport`（页面自报尺寸）不因 resize 刷新 → 稳定后重读（第 29 项断言）
 - [ ] 该修复待下次冷启动生效（不影响拖拽跟随本身，只影响 `pageViewport` 读数与指针兜底）
 
-## M5 — Firefox 原生支持（WebDriver BiDi）· 已完成 2026-10-02
+## M5 — Firefox 原生支持（WebDriver BiDi）· 已交付，随后**整体移除**
 
-- [x] 后端接缝 `#io`：Chromium/CDP 与 Firefox/BiDi 两个实现，共享运行时与人手运动模型
-- [x] `src/remote.js`：协议无关的 WebSocket 传输（原 `cdp.js`，改名以免混淆两个协议）
-- [x] `src/bidi.js`：BiDi 客户端 + RemoteValue 反序列化 + 会话订阅 + 两种错误形状兼容
-- [x] `src/backends/firefox.js`：context 生命周期、导航、轮询帧、输入（含私有区码点键）、视口、事件
-- [x] `browser: 'auto'|'chromium'|'firefox'` + `firefoxPath`；陈旧实例探测改为引擎无关（Firefox 无 `/json/version`）
-- [x] 验收 `scripts/smoke-firefox.mjs`：18 条断言，**有头与无头都通过**
-- [x] 修掉的实测差异：命名键码点、轮询帧尺寸、有头新建页 resize 挂死（改为非阻塞 + 加载后重试）
-- [ ] 帧率仍有差距（Firefox 轮询 vs CDP 推送）——文档已如实标注，未承诺追平
+当时确实做完了：独立后端（`src/backends/firefox.js`）、BiDi 客户端（`src/bidi.js`）、
+轮询帧、私有区码点命名键、`smoke-firefox.mjs` 18 条断言。**后来按项目决定把它整体删掉**：
+两个引擎 = 两套协议 + 两套 profile 布局 + 两套坑，维护成本翻倍而能力没有翻倍。
+要再做，应当作为**独立项目**——接缝（`#io`）与协议无关传输层（`src/remote.js`）都还在。
 
+- [x] 后端接缝 `#io`：协议无关的运行时 + 人手运动模型
+- [x] `src/remote.js`：协议无关的 WebSocket 传输（原 `cdp.js`）
+- [x] Firefox 后端与 BiDi 客户端，18 条断言全过
+- [x] 修掉的实测差异：命名键码点、轮询帧尺寸、有头新建页 resize 挂死
+- [x] **移除**：`src/backends/firefox.js`、`src/bidi.js`、`smoke-firefox.mjs`、`probe-firefox-protocol.mjs`、
+      `vendor-firefox.sh`、`browser: 'firefox'`、`firefoxPath`、`hideWebdriver`、Firefox cookie 导入、跨引擎互斥
 
 ## M6 — 搜索引擎预配置与自主选择（已完成，2026-10-02）
 

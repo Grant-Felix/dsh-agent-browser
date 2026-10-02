@@ -1,9 +1,8 @@
 /**
- * One human-pointer motion model, shared by every engine backend.
+ * One human-pointer motion model.
  *
- * Two control channels (CDP for Chromium, WebDriver BiDi for Firefox) must not
- * drift into two different ideas of "human-like"; the planning lives here and the
- * backends only decide how to deliver the samples.
+ * The planning lives here so that "human-like" cannot drift into several
+ * definitions; a backend only decides how to deliver the samples.
  */
 
 /**

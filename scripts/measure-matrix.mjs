@@ -1,7 +1,7 @@
 /**
  * The pass-rate matrix: every reachable system × engine × display mode.
  *
- *   HOME=<workspace>/.dev/home node scripts/measure-matrix.mjs <chromium|firefox>
+ *   HOME=<workspace>/.dev/home node scripts/measure-matrix.mjs
  *
  * Each system gets its OWN machine-readable verdict instead of a generic keyword
  * match, because "the page mentions captcha" is true of every demo page. For the
@@ -20,10 +20,7 @@ const engine = (process.argv[2] ?? 'chromium').toLowerCase();
 // One display mode: headed, with the Sidebar panel as the head. There is no
 // headed/headless axis to sweep any more.
 const mode = 'sidebar-headed';
-if (!['chromium', 'firefox'].includes(engine)) {
-  console.log('usage: node scripts/measure-matrix.mjs <chromium|firefox>');
-  process.exit(1);
-}
+
 
 /** Each entry carries its own verdict expression, evaluated after settle. */
 const ONLY = process.argv.slice(4);
@@ -34,7 +31,7 @@ const ALL_TARGETS = [
     kind: 'recaptcha',
     // Ask reCAPTCHA v3 directly for a token. The old verdict looked for a score
     // rendered by the demo's own server-side verification, which made the row
-    // depend on that page's flow rather than on the browser (Firefox read as
+    // depend on that page's flow rather than on the browser (it read as
     // "no score" while it was in fact being handed a 2446-char token). A token is
     // the honest signal: v3 accepted the request without showing a challenge.
     verdict: `(async () => {
@@ -245,7 +242,7 @@ for (const target of TARGETS) {
     await browser.navigate(target.url, { settleMs: 15_000 });
     // Poll to a terminal state instead of reading once: a v3 score appears
     // asynchronously (measured late on BOTH engines, which made an earlier run
-    // report "unknown" for Firefox when it actually scores 0.9), and Cloudflare's
+    // report "unknown" when the token was actually issued), and Cloudflare's
     // interstitial clears itself after a few seconds.
     const TERMINAL = new Set(['pass', 'fail', 'blocked', 'flagged']);
     let verdict = null;

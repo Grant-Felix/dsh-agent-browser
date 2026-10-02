@@ -2,10 +2,9 @@
  * A minimal remote-protocol transport over the platform WebSocket.
  *
  * This is NOT the Chrome DevTools Protocol: it is the request/response and event
- * framing that CDP and WebDriver BiDi happen to share (`{id, method, params}` out;
- * `{id, result}` / `{id, error}` and `{type:'event', method, params}` back). Both
- * engine backends sit on top of it, and each keeps its own protocol semantics —
- * see `backends/chromium.js` (CDP) and `backends/firefox.js` (BiDi).
+ * framing CDP uses (`{id, method, params}` out; `{id, result}` / `{id, error}` and
+ * `{type:'event', method, params}` back). The backend sits on top of it and keeps
+ * all protocol semantics — see `backends/chromium.js`.
  *
  * Node >= 22 ships a global `WebSocket`, so there is no dependency here.
  */
@@ -165,7 +164,7 @@ export class RemoteClient {
       clearTimeout(pending.timer);
       if (message.error) {
         // Two error shapes travel on this transport: CDP puts `{code, message}`
-        // in `error`, while BiDi sends `error` as a code STRING and puts the
+        // in `error`, and some peers send `error` as a code STRING with the
         // text at the top level. Reading only the nested form reported the real
         // failure as "CDP error undefined" and hid it.
         const nested = typeof message.error === 'object' ? message.error : null;

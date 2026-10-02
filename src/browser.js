@@ -116,9 +116,10 @@ export class AgentBrowser {
   /** Where downloads land, when the engine supports it at all. */
   #downloadDir = null;
   /**
-   * The engine backend. Everything engine-specific (CDP for Chromium, WebDriver
-   * BiDi for Firefox) lives behind this interface; the registry, the reclaim
-   * hooks, persistence and frame pacing above it are engine-neutral.
+   * The engine backend. Everything CDP-specific lives behind this interface; the
+   * registry, the reclaim hooks, persistence and frame pacing above it are
+   * protocol-neutral (which is what made a second backend possible, and would
+   * again).
    */
   #io;
   /** `{ mode, headed, desktopWindow, reason }` — one mode only, see the config. */
@@ -265,10 +266,9 @@ export class AgentBrowser {
    * AUTO (0) means "no override": the page keeps the engine's own viewport,
    * which is what a host with no panel on screen should do.
    *
-   * Failures are reported, not thrown: on a headed engine a resize is negotiated
-   * with the window manager and can time out (measured: headed Firefox,
-   * `browsingContext.setViewport` exceeded 10 s while restoring a page). Losing a
-   * resize must not lose the page — the caller decides whether it is fatal.
+   * Failures are reported, not thrown: a resize can time out (measured: over 10 s
+   * while restoring a page). Losing a resize must not lose the page — the caller
+   * decides whether it is fatal.
    * @returns `{ applied, reason }`.
    */
   /**
@@ -345,8 +345,6 @@ export class AgentBrowser {
       modeReason: (this.#displayMode ?? resolveDisplayMode()).reason,
       // How many panels are showing this browser right now.
       viewers: this.#viewers,
-      // Which backend the state file says is up (only one may run at a time).
-      backendRunning: this.#recordedBackend(),
       // The screen the browser is using: the panel's own box once it reports one.
       screen: this.#screen(),
       pid: this.#child?.pid ?? null,
@@ -794,43 +792,6 @@ export class AgentBrowser {
     return result;
   }
 
-  /**
-   * The backend recorded as running in the state file, when its process is alive.
-   *
-   * `browser.json` is the single source of truth for "which browser is up"; this
-   * reads it without touching anything, so callers can see who holds the slot.
-   * @returns `{ pid, port, engine }` or null.
-   */
-  #recordedBackend() {
-    let record = null;
-    try {
-      record = JSON.parse(readFileSync(join(stateDir(), STATE_FILE), 'utf8'));
-    } catch {
-      return null;
-    }
-    if (!record?.pid) return null;
-    try {
-      process.kill(record.pid, 0);
-    } catch (error) {
-      if (error?.code !== 'EPERM') return null;
-    }
-    return { pid: record.pid, port: record.port ?? null, engine: record.engine ?? null };
-  }
-
-  /**
-   * Refuse to start when the OTHER engine is already running.
-   *
-   * Only one backend may run in this profile at a time. The check lives here (and
-   * not only in `#killStaleInstance`) because that method probes the old port with
-   * THIS engine's protocol, which by construction fails across engines — a Firefox
-   * left running would then never be seen, and two backends would run at once.
-   * @returns a refusal message, or null when this engine may start.
-   */
-  #otherBackendConflict() {
-    const running = this.#recordedBackend();
-    if (!running || running.engine === null || running.engine === this.#io.id) return null;
-    return `the ${running.engine} backend is already running (pid ${running.pid}${running.port ? `, port ${running.port}` : ''}) — only one backend may run at a time. Stop it first (the panel's "关闭"/stop control, or the tool's action=stop), then start ${this.#io.id}.`;
-  }
 
   /** Stop the browser and drop every subscription. Remembered pages survive. */
   async stop(reason = 'stopped by caller') {
@@ -881,27 +842,12 @@ export class AgentBrowser {
   // ------------------------------------------------------------------ internals
 
   async #start() {
-    // One backend at a time, enforced across processes: a second DSH session
-    // configured for the other engine is told why instead of quietly starting a
-    // competing browser (and, because panels auto-start their browser, refusing is
-    // also what prevents two sessions from fighting over the slot).
-    const conflict = this.#otherBackendConflict();
-    if (conflict) {
-      this.#setState('failed', conflict);
-      this.#log(`start refused: ${conflict}`);
-      return this.status();
-    }
     const binary = resolveEngineBinary(this.#config);
     if (!binary) {
-      this.#setState(
-        'failed',
-        this.#io.id === 'firefox'
-          ? 'no Firefox binary found (set firefoxPath in the plugin config)'
-          : 'no Chrome/Chromium binary found (set chromePath in the plugin config)',
-      );
+      this.#setState('failed', 'no Chrome/Chromium binary found (set chromePath in the plugin config)');
       return this.status();
     }
-    const userDataDir = resolveUserDataDir(this.#config, this.#io.id);
+    const userDataDir = resolveUserDataDir(this.#config);
     try {
       mkdirSync(userDataDir, { recursive: true });
       mkdirSync(stateDir(), { recursive: true });
@@ -960,8 +906,8 @@ export class AgentBrowser {
       this.#ioUnsubscribes.push(
         this.#io.onTargetCrashed(() => this.#setState('failed', 'a page target crashed')),
       );
-      // Downloads: where they go and how we hear about them. Firefox has no such
-      // command in BiDi, so a failure here is reported and the runtime continues.
+      // Downloads: where they go and how we hear about them. A failure here is
+      // reported and the runtime continues; downloads are not load-bearing.
       try {
         const downloadDir = this.#config.downloadDir || join(stateDir(), 'downloads');
         mkdirSync(downloadDir, { recursive: true });
@@ -1045,9 +991,8 @@ export class AgentBrowser {
     this.#pages.set(record.key, record);
     const session = record.sessionId;
     // The viewport is applied AFTER the page has loaded, not before: resizing a
-    // brand-new tab is what a headed engine negotiates with the window manager,
-    // and doing it before there is a document to lay out was measured hanging
-    // (headed Firefox: setViewport on a fresh context never answered). The same
+    // brand-new tab is negotiated with the display, and doing it before there is a
+    // document to lay out was measured hanging (the call never answered). The same
     // resize on a loaded page succeeds immediately.
     record.unsubscribes.push(
       this.#io.onNavigated(session, (url) => {
@@ -1087,9 +1032,9 @@ export class AgentBrowser {
       await this.#io.navigate(session, target);
     }
     await loaded;
-    // Not awaited: creating a page must never wait on a window-manager resize
-    // (measured hanging on a headed Firefox tab). The size is retried after every
-    // load instead, and a page that keeps the engine's default stays usable.
+    // Not awaited: creating a page must never wait on a resize (measured hanging
+    // on a fresh tab). The size is retried after every load instead, and a page
+    // that keeps the engine's default stays usable.
     this.#scheduleViewport(record);
     return record;
   }
@@ -1526,8 +1471,9 @@ export class AgentBrowser {
       return;
     }
     if (!stale?.port) return;
-    // Ask the engine, not Chrome's HTTP surface: Firefox 404s /json/version, so
-    // probing that endpoint would leave a stale Firefox running forever.
+    // Ask the engine's own readiness endpoint rather than assuming a port is
+    // alive: a browser that is up but not answering would otherwise be left
+    // running forever.
     try {
       await this.#io.ready(stale.port, 1200);
     } catch {

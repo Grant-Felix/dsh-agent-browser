@@ -81,18 +81,6 @@ check('clicking a download link saves the file', clicked, `${expected}`);
 const listed = await browser.evaluate('1');
 check('the page is still usable after a download', listed === 1);
 
-// Firefox: the engine has no download command, so it must say so, not pretend.
-const firefox = new AgentBrowser({
-  config: resolveConfig({ browser: 'firefox', sweepIntervalSec: 3600 }),
-  log: () => {},
-});
-const firefoxStatus = await firefox.ensureStarted();
-if (firefoxStatus.state === 'running') {
-  check('Firefox reports no download directory instead of faking one', firefox.status().downloadDir === null, String(firefox.status().downloadDir));
-  const firefoxDownloads = firefox.downloads();
-  check('and lists nothing', firefoxDownloads.items.length === 0 && firefoxDownloads.dir === null);
-}
-await firefox.dispose();
 
 await browser.dispose();
 await new Promise((resolve) => server.close(resolve));
