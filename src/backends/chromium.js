@@ -46,6 +46,13 @@ export class ChromiumBackend {
   static id = 'chromium';
 
   #client = null;
+  /**
+   * `sessionId -> the page's top-level frame id`.
+   *
+   * `Page.frameNavigated` and the loading events fire for every frame, so without
+   * this a subframe speaks for the page (see #rememberMainFrame).
+   */
+  #mainFrames = new Map();
   #log;
   #humanize = true;
   /** Input-motion knobs (speed, tremor amplitude, model) read per movement. */
@@ -207,10 +214,12 @@ export class ChromiumBackend {
     const sessionId = attached.sessionId;
     await this.#client.send('Page.enable', {}, sessionId);
     await this.#client.send('Runtime.enable', {}, sessionId);
+    await this.#rememberMainFrame(sessionId);
     return { targetId: created.targetId, sessionId };
   }
 
-  async closePage(targetId) {
+  async closePage(targetId, sessionId) {
+    if (sessionId) this.#mainFrames.delete(sessionId);
     await this.#client.send('Target.closeTarget', { targetId });
   }
 
@@ -451,15 +460,51 @@ export class ChromiumBackend {
     return this.#client.on('Page.loadEventFired', () => listener(), sessionId);
   }
 
+  /**
+   * Learn which frame is the page's top-level one.
+   *
+   * `Page.frameNavigated` and the two loading events fire for EVERY frame, so
+   * without this a subframe could speak for the page. Measured on Bing: its
+   * identity iframe navigates to https://www.bing.com/identity/idtokenv2, and the
+   * plugin reported that as the page URL — the panel's address bar then showed a
+   * token endpoint instead of the search results, which reads as "this site will
+   * not display".
+   * @param sessionId - the page session.
+   */
+  async #rememberMainFrame(sessionId) {
+    try {
+      const tree = await this.#client.send('Page.getFrameTree', {}, sessionId);
+      const id = tree?.frameTree?.frame?.id;
+      if (id) this.#mainFrames.set(sessionId, id);
+    } catch {
+      // Not fatal: the first parentless frameNavigated also records it.
+    }
+  }
+
   onNavigated(sessionId, listener) {
     return this.#client.on('Page.frameNavigated', (params) => {
-      if (params?.frame?.url) listener(params.frame.url);
+      const frame = params?.frame;
+      if (!frame?.url) return;
+      // The main frame is the one without a parent.
+      if (frame.parentId !== undefined) return;
+      this.#mainFrames.set(sessionId, frame.id);
+      listener(frame.url);
     }, sessionId);
   }
 
   onLoading(sessionId, listener) {
-    const offStart = this.#client.on('Page.frameStartedLoading', () => listener(true), sessionId);
-    const offStop = this.#client.on('Page.frameStoppedLoading', () => listener(false), sessionId);
+    // Subframe loads must not flap the page's loading state either.
+    const isMain = (params) => {
+      const main = this.#mainFrames.get(sessionId);
+      if (main === undefined || params?.frameId === undefined) return true;
+      return params.frameId === main;
+    };
+    const offStart = this.#client.on('Page.frameStartedLoading', (params) => {
+      if (isMain(params)) listener(true);
+    }, sessionId);
+    const offStop = this.#client.on('Page.frameStoppedLoading', (params) => {
+      if (isMain(params)) listener(false);
+    }, sessionId);
     return () => {
       offStart();
       offStop();

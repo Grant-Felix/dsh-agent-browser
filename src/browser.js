@@ -1111,7 +1111,7 @@ export class AgentBrowser {
     if (record.state !== 'live') return;
     if (record.key === this.#activeKey) await this.#stopScreencast(record);
     try {
-      await this.#io?.closePage(record.targetId);
+      await this.#io?.closePage(record.targetId, record.sessionId);
     } catch {
       // Already closed.
     }

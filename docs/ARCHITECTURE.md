@@ -692,3 +692,24 @@ DSH 的插件装载器是**无缓存破坏的 `await import(name)`**（`cordis-p
 - `vendor/chrome-linux/`：来自用户提供的 `chrome-linux.zip`（Chromium 157.0.8079.0 Linux
   构建），仅作为**运行时基座**随项目分发，不随本仓库版本管理（见 `.gitignore`）。再分发前请
   自行核对该构建的许可与源码获取信息。
+
+## 19. 子框架导航不得改写页面 URL（实测于 Bing）
+
+`Page.frameNavigated` 与两个 loading 事件**对每个 frame 都触发**。最初的实现直接采信了事件里的 URL：
+
+```js
+return this.#client.on('Page.frameNavigated', (params) => {
+  if (params?.frame?.url) listener(params.frame.url);   // 任何 frame
+}, sessionId);
+```
+
+Bing 搜索结果页内嵌一个身份 iframe，它会跳到 `https://www.bing.com/identity/idtokenv2`。
+于是 **`status.url`、面板地址栏、工具状态行全部显示成那个 token 端点**，而屏幕上明明是搜索结果页——
+用户看到的就是"这个网站打不开"。
+
+修法（Chromium 后端）：以 `frame.parentId === undefined` 判定主框架并记住其 id（`Page.getFrameTree` 初始化），
+loading 事件也按该 id 过滤，避免子框架让加载状态抖动。
+Firefox 天生没这个问题：BiDi 的 `browsingContext.navigationStarted` / `load` 是**按 context** 投递的，
+运行时只订阅了顶层 context，子框架事件根本不会送到。
+
+回归测试：`scripts/smoke-url.mjs`（本地自建同形状页面，两引擎都要过，不依赖第三方站点）。

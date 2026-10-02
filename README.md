@@ -670,6 +670,9 @@ HOME=$PWD/.dev/home node scripts/smoke-routes.mjs
 # 生命周期验收：收页 / 超时回收 / 上限 / 磁盘记忆 / 冷启动还原（29 项断言）
 HOME=$PWD/.dev/home node scripts/smoke-lifecycle.mjs
 
+# 页面 URL 的完整性：子框架导航不得改写页面 URL（Bing 身份 iframe 曾把面板地址栏污染成 token 端点）
+HOME=$PWD/.dev/home node scripts/smoke-url.mjs
+
 # 可见且可操作：Chromium/Firefox × 有头/无头 四种组合
 HOME=$PWD/.dev/home node scripts/smoke-visibility.mjs
 
