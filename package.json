@@ -1,0 +1,37 @@
+{
+  "name": "dsh-agent-browser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Agent browser for DSH: a real Chrome-Linux browser driven over CDP, shown live in the right Sidebar, plus agent-facing browser tools.",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
+      ]
+    }
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "src",
+    "docs",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  }
+}

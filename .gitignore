@@ -1,0 +1,9 @@
+# The browser base is a ~700 MB extracted Chrome-Linux tree. It is a build
+# input, not source: re-create it with scripts/vendor-chrome.sh.
+vendor/
+
+# Local runtime state (profile, pid/port lock, smoke-test artifacts).
+.dev/
+
+node_modules/
+*.log

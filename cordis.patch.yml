@@ -1,0 +1,15 @@
+# dsh-agent-browser bundle patch.
+#
+# The row specifier MUST equal package.json `name`: the client-modules scan
+# matches the nearest manifest name against the Loader specifier, and the boot
+# row id is the package name. A mismatched specifier silently loses the Client
+# half (the host tools keep working, the Sidebar panel never appears).
+#
+# The row is inserted without a `config:` block on purpose — every field
+# defaults in src/config.js, so an empty row is a valid, fully-defaulted
+# installation. Add `config:` here (or in the profile's own patch layer) to
+# override any field; a matching override replaces the complete config, so
+# repeat every field you want to keep.
+- insert:
+    - id: agent-browser
+      name: 'dsh-agent-browser'
